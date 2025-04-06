@@ -1,158 +1,37 @@
-let targetElement = null;
+// content.js - ページに注入され、DOM操作や加工を行う
 
+let contextElement = null; // 右クリックされた要素を保持する変数
+
+// --- 右クリックイベントを捕捉 ---
+// run_at: document_start と組み合わせることで、ページの早い段階でリスナーを設定
 document.addEventListener('contextmenu', (event) => {
-    targetElement = event.target;
-});
+    contextElement = event.target;
+    console.log('Columnizer: contextmenu target set:', contextElement); // デバッグ用
+}, true); // キャプチャフェーズで捕捉 (より確実に)
 
+// --- Background Script からのメッセージを処理 ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'getClickedElement') {
-        if (targetElement) {
-            const html = new NakedHTML(targetElement);
-            sendResponse({ element: html.toString() });
-            targetElement = null; // リセット
-        } else {
-            sendResponse({ element: null });
-        }
+    if (request.action !== 'markStartElement') return;
+
+    if (!contextElement || !(contextElement instanceof Element)) {
+        console.warn("Columnizer: 起点となる要素が見つかりませんでした。");
+        sendResponse({ error: "起点要素が見つかりません。ページ上で右クリックしてからメニューを選択してください。" });
+        return;
     }
+    const body = contextElement.ownerDocument?.body
+
+    if (!body) {
+        sendResponse({ error: "このウェブページはマルチカラム化できません（HTML文書ではありません）" });
+        return;
+    }
+
+    const START_ELEMENT_ATTR = 'data-net-jintrick-columnizer-start-elemet';
+    contextElement.setAttribute(START_ELEMENT_ATTR, "");
+
+    // 開始要素にdata-*属性をつけたbody要素のコードをbackground.jsに送信
+    sendResponse({ processedHtml: body.cloneNode(true).outerHTML });
+
+    console.log('Columnizer: 加工済みHTMLをbackgroundに送信しました。');
+    contextElement.removeAttribute(START_ELEMENT_ATTR);
 });
 
-Element.prototype.setTinyText = function (text, maxLength = 20) {
-    if (text.length > 20) {
-        this.title = text;
-        text = text.slice(0, 20) + "...";
-    }
-    this.innerText = text;
-}
-
-class NakedHTML {
-    // マルチカラム用に加工するHTMLをDocumentFragment内で扱うクラス
-
-    #START_ELEMENT_ID = "net_jintrick_columnizer_startElement";
-    #ATTRIBUTES_TO_KEEP = ['href', 'alt', 'title', 'lang', 'src'];
-    #WRAPPERS_TO_KEEP = ['TABLE', 'UL', 'OL', 'SVG', 'VIDEO'];
-    constructor(startElement) {
-
-        if (startElement.nodeType !== Node.ELEMENT_NODE) {
-            throw new Error(`startElementに要素ノード以外が指定された？？？: ${startElement.nodeType}`);
-            debugger;
-        }
-
-        startElement.setAttribute(`data-${this.#START_ELEMENT_ID}`, '');
-
-        const doc = startElement.ownerDocument;
-        const df = doc.createDocumentFragment();
-        df.appendChild(doc.body.cloneNode(true));
-
-        this.root = df;
-    }
-
-    toString() {
-        this.removeWrapper();
-        this.removeAttributes();
-        return this.root.firstChild.outerHTML;
-    }
-
-    removeAttributes() {
-        // TreeWalkerの作成
-        const walker = document.createTreeWalker(this.root, NodeFilter.SHOW_ELEMENT);
-
-        // 各ノードを巡回
-        let el;
-        while (el = walker.nextNode()) {
-            // 各属性をチェックし、保持リストにないものを削除
-            Array.from(el.attributes).forEach(attr => {
-                const attrName = attr.name;
-                if (!this.#ATTRIBUTES_TO_KEEP.includes(attrName)) {
-                    el.removeAttribute(attrName);
-                }
-            });
-        }
-    }
-
-
-    removeWrapper(parent = this.root) {
-        // 子ノードのリストを作成（ライブコレクションの変更を避けるため）
-        const children = Array.from(parent.childNodes);
-
-        // 各子ノードを処理
-        for (const node of children) {
-            // 要素ノードだけを処理
-            if (node.nodeType !== Node.ELEMENT_NODE
-                || this.#WRAPPERS_TO_KEEP.includes(node.nodeName)) continue;
-
-            // 末端から再帰的に処理
-            this.removeWrapper(node);
-
-            //要素別のハンドラを呼び出し
-            let handler
-            if (handler = this[`handle_${node.nodeName}`])
-                handler(node);
-
-            // ラッパー要素と判断する条件:
-            // 1. 子ノードが1つだけ
-            // 2. その子ノードがElement
-            // 3. 特別な属性がない
-            const child = node.firstChild
-            const hasOneChild = node.childNodes.length === 1;
-            const hasElementChild = child && child.nodeType === Node.ELEMENT_NODE;
-            const hasSpecialAttributes = Array.from(node.attributes).some(attr =>
-                attr.name.startsWith('data-') ||
-                attr.name.startsWith('aria-') ||
-                attr.name === 'role');
-            if (hasOneChild && hasElementChild && !hasSpecialAttributes) {
-                node.replaceWith(child);
-            }
-        }
-    }
-
-    handle_IMG(img) {
-        let src;
-        if (!(src = img.src)) return;
-
-        const text = img.alt ? img.alt : src;
-        const a = img.ownerDocument.createElement('a');
-
-        a.setTinyText(text);
-        a.href = img.src;
-        a.setAttribute('data-role', 'img')
-        a.setAttribute('data-width', img.width);
-        a.setAttribute('data-height', img.height);
-        img.replaceWith(a);
-    }
-
-    handle_IFRAME(iframe) {
-        let src;
-        let title;
-        if (!(src = iframe.src)) return;
-        if (!(title = iframe.contentDocument?.title)) return;
-
-        const a = iframe.ownerDocument.createElement('a');
-
-        a.setTinyText(title);
-        a.href = iframe.src;
-        a.setAttribute('data-role', 'iframe');
-        iframe.replaceWith(a);
-    }
-
-    handle_VIDEO(video) {
-        let src;
-        if (!(src = video.src)) return;
-
-        // 代替テキストの取得（例）
-        let text;
-        if (!(text = video.title)) {
-            text = src;
-        }
-        const a = video.ownerDocument.createElement('a');
-
-        a.setTinyText(text);
-        a.href = src;
-        a.setAttribute('data-role', 'video');
-
-        if (video.poster) {
-            a.setAttribute('data-poster', video.poster);
-        }
-
-        video.replaceWith(a);
-    }
-}

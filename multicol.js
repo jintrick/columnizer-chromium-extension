@@ -1,3 +1,5 @@
+import { NakedHTML } from "./NakedHTML.js";
+
 // multicol.js - Columnizer拡張機能のマルチカラム表示と分割処理を担当
 
 class ContentSplitter {
@@ -9,7 +11,10 @@ class ContentSplitter {
         this.originalContent = null;
         this.pageSize = { width: 0, height: 0 };
         this.columnGap = 20; // カラム間の余白
-        this.columnCount = 2; // デフォルトのカラム数
+        this.columnWidth = '25em'; // カラム幅のデフォルト値
+        this.pages = []; // 明示的に初期化
+        this.estimatedColumnCount = 1; // 明示的に初期化
+        this.pageInfoElement = null; // 明示的に初期化
 
         // 初期設定
         this.init();
@@ -45,6 +50,9 @@ class ContentSplitter {
         // マルチカラム設定を適用
         this.applyMultiColumnLayout();
 
+        // ページサイズを更新
+        this.updatePageSize();
+
         // スクロールバーがあれば分割処理を行う
         if (this.needsSplitting()) {
             this.splitContent();
@@ -53,8 +61,8 @@ class ContentSplitter {
     }
 
     applyMultiColumnLayout() {
-        // コンテナにマルチカラムスタイルを適用
-        this.container.style.columnCount = this.columnCount;
+        // コンテナにマルチカラムスタイルを適用（カラム幅ベース）
+        this.container.style.columnWidth = this.columnWidth;
         this.container.style.columnGap = `${this.columnGap}px`;
         this.container.style.columnFill = 'auto';
         this.container.style.height = '100vh';
@@ -83,11 +91,23 @@ class ContentSplitter {
     }
 
     updatePageSize() {
-        // 現在のページサイズを取得（カラム考慮）
+        // 現在のページサイズを取得
+        const computedStyle = window.getComputedStyle(this.container);
+        // 実際のカラム幅を取得
+        const actualColumnWidth = parseFloat(computedStyle.columnWidth) || parseFloat(this.columnWidth) || 400;
+
         this.pageSize = {
-            width: this.container.clientWidth / this.columnCount,
+            width: actualColumnWidth,
             height: this.container.clientHeight
         };
+
+        // 現在のカラム数を計算（コンテンツ分割処理用）
+        const containerWidth = this.container.clientWidth;
+        const columnGap = parseFloat(computedStyle.columnGap) || this.columnGap;
+        const estimatedColumnCount = Math.max(1, Math.floor((containerWidth + columnGap) / (actualColumnWidth + columnGap)));
+
+        // 分割処理で使用するカラム数を更新
+        this.estimatedColumnCount = estimatedColumnCount;
     }
 
     splitContent() {
@@ -129,7 +149,6 @@ class ContentSplitter {
 
     splitTextNode(textNode, targetElement, pages) {
         // テキストノードをそのまま追加
-        // 実際のテキスト分割はページの高さオーバーフローで処理
         const clone = textNode.cloneNode(true);
         targetElement.appendChild(clone);
 
@@ -194,10 +213,10 @@ class ContentSplitter {
         const testContainer = document.createElement('div');
 
         // テスト用のコンテナにマルチカラムスタイルを適用
-        testContainer.style.columnCount = this.columnCount;
+        testContainer.style.columnWidth = this.columnWidth;
         testContainer.style.columnGap = `${this.columnGap}px`;
         testContainer.style.height = `${this.pageSize.height}px`;
-        testContainer.style.width = `${this.pageSize.width * this.columnCount}px`;
+        testContainer.style.width = `${this.pageSize.width * this.estimatedColumnCount}px`;
         testContainer.style.position = 'absolute';
         testContainer.style.left = '-9999px';
         testContainer.style.overflow = 'hidden';
@@ -224,6 +243,9 @@ class ContentSplitter {
         // 指定ページを表示
         const pageContent = this.pages[pageIndex].cloneNode(true);
         this.container.appendChild(pageContent);
+
+        // マルチカラムレイアウトを再適用
+        this.applyMultiColumnLayout();
 
         // カレントページを更新
         this.currentPage = pageIndex;
@@ -278,39 +300,16 @@ class ContentSplitter {
     }
 
     setupUIControls() {
-        // カラム数変更用のコントロール
+        // シンプル化したUIコントロール（親要素拡大ボタンのみ）
         const controls = document.createElement('div');
         controls.className = 'columnizer-controls';
         controls.style.position = 'fixed';
         controls.style.top = '20px';
         controls.style.right = '20px';
 
-        const columnLabel = document.createElement('label');
-        columnLabel.textContent = 'カラム数: ';
-
-        const columnSelect = document.createElement('select');
-        [1, 2, 3, 4].forEach(num => {
-            const option = document.createElement('option');
-            option.value = num;
-            option.textContent = num;
-            if (num === this.columnCount) {
-                option.selected = true;
-            }
-            columnSelect.appendChild(option);
-        });
-
-        columnSelect.onchange = (e) => {
-            this.columnCount = parseInt(e.target.value, 10);
-            this.renderContent();
-        };
-
-        columnLabel.appendChild(columnSelect);
-        controls.appendChild(columnLabel);
-
         // 親ノード選択コントロール（拡大/縮小）
         const expandBtn = document.createElement('button');
         expandBtn.textContent = '親要素に拡大';
-        expandBtn.style.marginLeft = '10px';
         expandBtn.onclick = () => {
             // メッセージを送信してbackground.jsに親要素を要求
             chrome.runtime.sendMessage({ action: 'expandContent' });
@@ -318,6 +317,57 @@ class ContentSplitter {
 
         controls.appendChild(expandBtn);
         document.body.appendChild(controls);
+    }
+
+    // メッセージハンドリングの追加
+    setupMessageHandlers() {
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+            // 各種メッセージに対応するハンドラー
+            switch (request.action) {
+                case 'displayHtmlContent':
+                    this.handleDisplayHtmlContent(request, sendResponse);
+                    break;
+                case 'changeColumnWidth':
+                    this.handleChangeColumnWidth(request, sendResponse);
+                    break;
+                // 他のメッセージタイプを追加可能
+            }
+            // 非同期レスポンスをサポートするため true を返す
+            return true;
+        });
+    }
+
+    handleDisplayHtmlContent(request, sendResponse) {
+        try {
+            const htmlContent = request.html;
+            // 新しいコンテンツをパース
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlContent, 'text/html');
+            this.originalContent = doc.body.firstChild;
+
+            // 新しいコンテンツで再レンダリング
+            this.renderContent();
+
+            sendResponse({ success: true });
+        } catch (error) {
+            console.error('HTML表示エラー:', error);
+            sendResponse({ success: false, error: error.message });
+        }
+    }
+
+    handleChangeColumnWidth(request, sendResponse) {
+        try {
+            // カラム幅を変更
+            this.columnWidth = request.width || '25em';
+
+            // レイアウトを再適用
+            this.renderContent();
+
+            sendResponse({ success: true });
+        } catch (error) {
+            console.error('カラム幅変更エラー:', error);
+            sendResponse({ success: false, error: error.message });
+        }
     }
 }
 
@@ -329,6 +379,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // コンテンツスプリッターを初期化
             const splitter = new ContentSplitter('content-container', response.content);
 
+            // メッセージハンドラーを設定
+            splitter.setupMessageHandlers();
+
             // グローバルに保存（デバッグ用）
             window.splitter = splitter;
         } else {
@@ -338,3 +391,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+// 既存のリスナーは削除して統合
+// chrome.runtime.onMessage.addListener();は削除

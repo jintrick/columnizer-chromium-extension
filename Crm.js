@@ -1,8 +1,13 @@
 export class Tab {
-    constructor(tab_) {
-        this._tab = tab_;
+    /**
+     * ChromeのTabを抽象化するクラス
+     * @version 20250417
+     * @params {chrome.tabs.Tab} tab
+     */
+    constructor(tab) {
+        this._tab = tab;
         this._url = null;
-        this.title = tab_.title;
+        this.title = tab.title;
     }
     get id() {
         return this._tab.id;
@@ -10,6 +15,7 @@ export class Tab {
     get url() {
         return this._url || (this._url = new URL(this._tab.url));
     }
+
     /**
      * このタブにメッセージを送信します。
      * @param {object} message 送信するメッセージオブジェクト
@@ -20,7 +26,7 @@ export class Tab {
     }
 
     /**
-     * このタブにデータを送信し、処理を依頼します（内部的に準備完了確認を行います）。
+     * このタブにaction名"feedData"でデータを送信します（タブのhtml側はcrm.getRequestで受け取ります）。
      * @param {any} data 送信するデータ
      * @param {number} [timeout=5000] タイムアウトまでのミリ秒数
      * @returns {Promise<any>} コンテンツスクリプトからの応答
@@ -56,13 +62,14 @@ export class Tab {
     }
 }
 
+
 class Crm {
     /**
      * ChromeのUIを抽象化するクラス
      * @version 20250407
      */
     constructor() {
-        this._messageListeners = {};
+
     }
 
     /**
@@ -92,23 +99,49 @@ class Crm {
         });
     }
 
+    /**
+     * アクティブタブを取得する（コンテクストなし）
+     * @returns {Promise<Tab>}
+     */
     async getActiveTab() {
         let queryOptions = { active: true, currentWindow: true };
         let [tab_] = await chrome.tabs.query(queryOptions);
         return new Tab(tab_);
     }
 
-    async getRequest(actionName) {
-        return new Promise((resolve) => {
+    /**
+     * タブを取得する(chrome.tabs.Tabオブジェクトより)
+     * @param {chrome.tabs.Tab} tab 
+     */
+    getTab(tab) {
+        return new Tab(tab);
+    }
+
+    i18n(message, substitute = undefined) {
+        return chrome.i18n.getMessage(message, substitute);
+    }
+
+    getRequest(actionName, timeout = 10000) {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                chrome.runtime.onMessage.removeListener(listener);
+                reject(new Error(`アクション "${actionName}" の待機がタイムアウトしました。`));
+            }, timeout);
+
             const listener = (request, sender, sendResponse) => {
                 if (request && request.action === actionName) {
+                    clearTimeout(timer);
                     chrome.runtime.onMessage.removeListener(listener);
-                    resolve(request);
+                    resolve(request.data);
+                    sendResponse({ status: "received" });
+                    return true;
                 }
             };
+
             chrome.runtime.onMessage.addListener(listener);
         });
     }
+
 }
 
 const crm = new Crm();

@@ -1,17 +1,19 @@
 export class ContentScript {
     /**
-     * コンテンツスクリプトとの通信を抽象化するクラス
+     * コンテンツスクリプトとの通信を抽象化するクラス(menifest.jsonでcontents.jsのパスを登録しておくこと)
      * @version 20250406
      * @param {number} tabId - 通信対象のタブID
      * @param {number} frameId - フレームID (デフォルト: 0)
+     * @param {Object} info - crome.contextMenus.onClickedイベントから渡されるinfoオブジェクト (デフォルト：null)
      */
-    constructor(tabId, frameId = 0) {
+    constructor(tabId, frameId = 0, info = null) {
         if (!tabId || typeof tabId !== 'number') {
             throw new Error('有効なタブIDが提供されていません');
         }
 
         this.tabId = tabId;
         this.frameId = frameId;
+        this.info = info;
     }
 
     /**
@@ -24,7 +26,7 @@ export class ContentScript {
         if (!tab?.id) {
             throw new Error('コンテキストメニュークリック: 有効なタブが提供されていません');
         }
-        return new ContentScript(tab.id, info?.frameId || 0);
+        return new ContentScript(tab.id, info?.frameId || 0, info);
     }
 
     /**

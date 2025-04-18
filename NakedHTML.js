@@ -9,29 +9,14 @@ Element.prototype.setTinyText = function (text, maxLength = 20) {
 export class NakedHTML {
     // マルチカラム用に加工するHTMLをDocumentFragment内で扱うクラス
 
-    #START_ELEMENT_ID = "net_jintrick_columnizer_startElement";
     #ATTRIBUTES_TO_KEEP = ['href', 'alt', 'title', 'lang', 'src'];
     #WRAPPERS_TO_KEEP = ['TABLE', 'UL', 'OL', 'SVG', 'VIDEO'];
-    constructor(startElement) {
-
-        if (startElement.nodeType !== Node.ELEMENT_NODE) {
-            throw new Error(`startElementに要素ノード以外が指定された？？？: ${startElement.nodeType}`);
-            debugger;
-        }
-
-        startElement.setAttribute(`data-${this.#START_ELEMENT_ID}`, '');
-
-        const doc = startElement.ownerDocument;
-        const df = doc.createDocumentFragment();
-        df.appendChild(doc.body.cloneNode(true));
-
-        this.root = df;
+    constructor(rootElement) {
+        this.root = rootElement;
     }
 
     toString() {
-        this.removeWrapper();
-        this.removeAttributes();
-        return this.root.firstChild.outerHTML;
+        return this.root.outerHTML;
     }
 
     removeAttributes() {
@@ -39,8 +24,8 @@ export class NakedHTML {
         const walker = document.createTreeWalker(this.root, NodeFilter.SHOW_ELEMENT);
 
         // 各ノードを巡回
-        let el;
-        while (el = walker.nextNode()) {
+        let el = this.root;
+        while (el) {
             // 各属性をチェックし、保持リストにないものを削除
             Array.from(el.attributes).forEach(attr => {
                 const attrName = attr.name;
@@ -48,11 +33,12 @@ export class NakedHTML {
                     el.removeAttribute(attrName);
                 }
             });
+            el = walker.nextNode();
         }
     }
 
 
-    removeWrapper(parent = this.root) {
+    removeWrappers(parent = this.root) {
         // 子ノードのリストを作成（ライブコレクションの変更を避けるため）
         const children = Array.from(parent.childNodes);
 
@@ -63,31 +49,31 @@ export class NakedHTML {
                 || this.#WRAPPERS_TO_KEEP.includes(node.nodeName)) continue;
 
             // 末端から再帰的に処理
-            this.removeWrapper(node);
+            this.removeWrappers(node);
 
             //要素別のハンドラを呼び出し
             let handler
-            if (handler = this[`handle_${node.nodeName}`])
+            if (handler = this[`_handle_${node.nodeName}`])
                 handler(node);
 
             // ラッパー要素と判断する条件:
             // 1. 子ノードが1つだけ
             // 2. その子ノードがElement
-            // 3. 特別な属性がない
+            // (3. 特別な属性がない)
             const child = node.firstChild
             const hasOneChild = node.childNodes.length === 1;
             const hasElementChild = child && child.nodeType === Node.ELEMENT_NODE;
-            const hasSpecialAttributes = Array.from(node.attributes).some(attr =>
-                attr.name.startsWith('data-') ||
-                attr.name.startsWith('aria-') ||
-                attr.name === 'role');
-            if (hasOneChild && hasElementChild && !hasSpecialAttributes) {
+            // const hasSpecialAttributes = Array.from(node.attributes).some(attr =>
+            //     attr.name.startsWith('data-') ||
+            //     attr.name.startsWith('aria-') ||
+            //     attr.name === 'role');
+            if (hasOneChild && hasElementChild) { // && !hasSpecialAttributes) {
                 node.replaceWith(child);
             }
         }
     }
 
-    handle_IMG(img) {
+    _handle_IMG(img) {
         let src;
         if (!(src = img.src)) return;
 
@@ -102,7 +88,7 @@ export class NakedHTML {
         img.replaceWith(a);
     }
 
-    handle_IFRAME(iframe) {
+    _handle_IFRAME(iframe) {
         let src;
         let title;
         if (!(src = iframe.src)) return;
@@ -116,7 +102,7 @@ export class NakedHTML {
         iframe.replaceWith(a);
     }
 
-    handle_VIDEO(video) {
+    _handle_VIDEO(video) {
         let src;
         if (!(src = video.src)) return;
 

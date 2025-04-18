@@ -1,0 +1,13 @@
+{
+    "app-name": {
+        "message": "Columnizer"
+    },
+    "widen": {
+        "message": "範囲を広げる",
+        "description": "マルチカラム表示の対象範囲を広げる"
+    },
+    "undo": {
+        "message": "元に戻す",
+        "description": "操作を一つ前に戻す"
+    }
+}

@@ -92,7 +92,7 @@ class Crm {
                 } catch (error) {
                     console.error(`タブ ${tab.id} の準備完了に失敗しました:`, error);
                     // 作成に失敗したタブは閉じる
-                    chrome.tabs.remove(tab.id);
+                    // chrome.tabs.remove(tab.id);
                     reject(error);
                 }
             });
@@ -119,6 +119,48 @@ class Crm {
 
     i18n(message, substitute = undefined) {
         return chrome.i18n.getMessage(message, substitute);
+    }
+
+    /**
+     * バックグラウンドスクリプトに対して「準備完了(readyCheck)」メッセージを送信し、応答を待ちます。
+     * タブスクリプト(multicol.jsなど)での使用を想定しています。
+     * @returns {Promise<any>} バックグラウンドスクリプトからの応答
+     */
+    async signalReady() {
+        console.log('Crm (from tab): Signaling readiness to background.');
+        // chrome.runtime.sendMessage は、コールバックを省略するとPromiseを返します（レシーバーがsendResponseを呼んだ場合）
+        // バックグラウンドスクリプト側の _waitForReady リスナーが sendResponse を呼ぶことを期待
+        return chrome.runtime.sendMessage({ action: "readyCheck" });
+    }
+
+
+    /**
+     * バックグラウンドスクリプトとの初期通信シーケンスを実行し、供給されるデータを取得します。
+     * (1. 準備完了を通知し、2. データ供給メッセージを待ち受ける)。
+     * タブスクリプト(multicol.jsなど)での使用を想定しています。
+     * @param {number} [timeout=10000] データ待ち受けのタイムアウト（ミリ秒）。準備完了通知の待ち時間も含む全体のタイムアウトと考える方が良いかもしれません。
+     * @returns {Promise<any>} バックグラウンドスクリプトから供給されたデータ（feedData の request.data）。
+     * @throws {Error} 通信シーケンス中にエラーが発生した場合（タイムアウトなど）。
+     */
+    async getDataFromBackground(timeout = 10000) {
+        console.log('Crm (from tab): Starting data acquisition sequence from background...');
+
+        try {
+            // 準備完了を通知し、バックグラウンドからの応答を待つ
+            const readyResponse = await this.signalReady();
+            console.log('Crm (from tab): Ready signal sent, received response:', readyResponse);
+
+            // バックグラウンドからデータが送られてくるのを待つ
+            const data = await this.getRequest("feedData", timeout);
+            console.log('Crm (from tab): Received feedData.');
+
+            return data;
+
+        } catch (error) {
+            console.error('Crm (from tab): Error during data acquisition sequence:', error);
+            // エラーは呼び出し元(multicol.js)で捕捉できるよう再スロー
+            throw error;
+        }
     }
 
     getRequest(actionName, timeout = 10000) {

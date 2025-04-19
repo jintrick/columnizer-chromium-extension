@@ -1,4 +1,3 @@
-import { ContentScript } from "./ContentScript.js";
 import { crm } from "./Crm.js";
 // このスクリプトでは2つのコールバックをイベントに登録すること「しか」しない
 
@@ -27,15 +26,21 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // コンテクストメニューにイベントリスナーを登録
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-    if (!info.menuItemId === CONTEXT_MENU_ID || !tab?.id) {
+    if (info.menuItemId !== CONTEXT_MENU_ID || !tab?.id) {
         return;
     }
 
     console.log("Columnizer: コンテキストメニューがクリックされました。", info);
 
+    let result;
+
     try {
         const Tab = crm.getTab(tab);
-        const bodyHtml = await Tab.sendMessage("markStartElement");
+        result = await Tab.sendMessage({ action: "markStartElement" });
+        if (result.status === "error") {
+            console.error(result.data);
+            return;
+        }
     } catch (error) {
         console.error("Columnizer: コンテンツスクリプトから応答を得られませんでした。:", error);
         return;
@@ -43,10 +48,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
     try {
         // multicol.htmlにouterHTMLを渡す
+        const bodyHtml = result.data
         const newTab = await crm.createNewTab("./multicol.html");
-        await newTab.feed(bodyHtml);
+        await newTab.feed(bodyHtml, timeout = 10000);
     } catch (error) {
         console.error("Columnizer: muticol.htmlから応答を得られませんでした。:", error);
     }
+
 });
 

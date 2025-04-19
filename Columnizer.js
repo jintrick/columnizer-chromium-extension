@@ -15,6 +15,9 @@ export class Columnizer {
 
 
     }
+    main() {
+        console.log('Columnizer: main()');
+    }
 }
 
 

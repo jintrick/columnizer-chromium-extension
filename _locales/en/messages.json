@@ -1,0 +1,14 @@
+{
+    "appName": {
+        "message": "Columnizer",
+        "description": "The name of the extension"
+    },
+    "widen": {
+        "message": "Expand Range",
+        "description": "Expands the target range for multi-column display"
+    },
+    "undo": {
+        "message": "Undo",
+        "description": "Reverts the previous action"
+    }
+}

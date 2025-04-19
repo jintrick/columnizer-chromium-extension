@@ -12,7 +12,8 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -20,9 +21,8 @@
         "<all_urls>"
       ],
       "js": [
-        "content.js"
+        "contents.js"
       ],
-      "run_at": "document_start",
       "all_frames": true
     }
   ],
@@ -30,9 +30,13 @@
     {
       "resources": [
         "multicol.html",
-        "multicol.js"
+        "multicol.js",
+        "Columnizer.js",
+        "Crm.js"
       ],
-      "use_dynamic_url": false
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "action": {
@@ -49,5 +53,6 @@
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "default_locale": "ja"
 }

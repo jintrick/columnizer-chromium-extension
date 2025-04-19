@@ -1,0 +1,1 @@
+export const testVar = "Hello from module!";

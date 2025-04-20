@@ -1,8 +1,22 @@
 import { crm } from "./Crm.js";
 
+console.log("multicol.js: Script loaded, initializing...");
+
+// 即リスナー登録
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log("multicol.js: Received message:", request);
+    if (request.action === "feedData") {
+        console.log("multicol.js: Processing feedData:", request.data);
+        document.body.innerHTML = request.data;
+        sendResponse({ status: "success" });
+        return true;
+    }
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
     console.log("multicol.js: DOM fully loaded, signaling ready.");
     try {
+        console.log("multicol.js: Sending readyCheck...");
         await crm.signalReady();
         console.log("multicol.js: Ready signal sent successfully.");
         document.body.textContent = "Ready signal sent.";

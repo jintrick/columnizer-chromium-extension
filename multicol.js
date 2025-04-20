@@ -17,16 +17,22 @@ import { Columnizer } from "./Columnizer.js";
 //     }
 // });
 
-crm.waitDataFromBackground((bodyHtml) => {
 
+
+// contents.js -> background.js -> multicol.js と渡ってくるbody.outerHTMLを処理するコールバックを登録
+crm.waitDataFromBackground((bodyHtml => {
     try {
-        const columnizer = new Columnizer(bodyHtml);
+        const nHtml = new NakedHTML();
+        nHtml.removeAttributes();
+        nHtml.removeWrappers();
+
+        const columnizer = new Columnizer(nHtml.toString());
         columnizer.main();
     } catch (error) {
         console.error("multicol.js: コンテンツ処理に失敗しました:", error);
         document.body.textContent = "コンテンツを読み込めませんでした。このタブを閉じて取得操作をやり直して下さい。";
     }
-});
+}));
 
 
 document.addEventListener("DOMContentLoaded", async () => {

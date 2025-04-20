@@ -49,8 +49,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     try {
         // multicol.htmlにouterHTMLを渡す
         const bodyHtml = result.data
-        const newTab = await crm.createNewTab("./multicol.html");
-        await newTab.feed(bodyHtml, timeout = 10000);
+        const newTab = await crm.createNewTab("./multicol.html", 15000);
+        await newTab.feed(bodyHtml, 10000);
     } catch (error) {
         console.error("Columnizer: muticol.htmlから応答を得られませんでした。:", error);
     }

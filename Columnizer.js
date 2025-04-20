@@ -37,7 +37,7 @@ HTMLElement.prototype.xpath = function (expression, resultType = XPathResult.ORD
     return Array.from({ length: result.snapshotLength }, (_, i) => result.snapshotItem(i));
 };
 
-Object.defineProperty(DocumentFragment.prototype, innerHTML, {
+Object.defineProperty(DocumentFragment.prototype, 'innerHTML', {
     set: function (newValue) {
         const div = document.createElement("DIV");
         div.innerHTML = newValue;

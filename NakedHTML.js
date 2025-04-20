@@ -4,22 +4,59 @@ Element.prototype.setTinyText = function (text, maxLength = 20) {
         text = text.slice(0, 20) + "...";
     }
     this.innerText = text;
-}
+};
+Element.prototype.replaceWith_ = function (node) {
+    console.log(`${this.nodeName} is replaced with ${node.nodeName}`, this, node);
+    this.replaceWith(node);
+};
+Node.prototype.remove_ = function () {
+    console.log(`${this.nodeName} is removed.`, this);
+    this.remove();
+};
 
 export class NakedHTML {
     // マルチカラム用に加工するHTMLをDocumentFragment内で扱うクラス
 
     #ATTRIBUTES_TO_KEEP = ['href', 'alt', 'title', 'lang', 'src'];
-    #WRAPPERS_TO_KEEP = ['TABLE', 'UL', 'OL', 'SVG', 'VIDEO'];
+    #WRAPPERS_TO_KEEP = ['TABLE', 'UL', 'OL', 'SVG', 'VIDEO', 'A'];
+    #NODE_TO_REMOVE = ['SCRIPT', 'STYLE', '#comment'];
     constructor(rootElement) {
         this.root = rootElement;
+        this.result = {
+            removeNodes: [],
+            removeAttributes: [],
+            removeWrappers: []
+        }
     }
 
     toString() {
         return this.root.outerHTML;
     }
 
-    removeAttributes() {
+    removeNodes(target = this.#NODE_TO_REMOVE) {
+        // 削除対象を先に収集する
+        const nodesToRemove = [];
+        const walker = document.createTreeWalker(this.root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_COMMENT);
+
+        let el = walker.currentNode;
+        while (el) {
+            if (this.#NODE_TO_REMOVE.includes(el.nodeName)) {
+                nodesToRemove.push(el);
+            }
+            el = walker.nextNode();
+        }
+
+        // 収集したノードを削除する
+        nodesToRemove.forEach(node => {
+            try {
+                node.remove_();
+            } catch (error) {
+                console.warn(error);
+            }
+        });
+    }
+
+    removeAttributes(exeption = this.#ATTRIBUTES_TO_KEEP) {
         // TreeWalkerの作成
         const walker = document.createTreeWalker(this.root, NodeFilter.SHOW_ELEMENT);
 
@@ -37,13 +74,13 @@ export class NakedHTML {
         }
     }
 
-
-    removeWrappers(parent = this.root) {
+    removeWrappers(parent = this.root, exeption = this.#WRAPPERS_TO_KEEP) {
         // 子ノードのリストを作成（ライブコレクションの変更を避けるため）
         const children = Array.from(parent.childNodes);
 
         // 各子ノードを処理
         for (const node of children) {
+
             // 要素ノードだけを処理
             if (node.nodeType !== Node.ELEMENT_NODE
                 || this.#WRAPPERS_TO_KEEP.includes(node.nodeName)) continue;
@@ -53,24 +90,31 @@ export class NakedHTML {
 
             //要素別のハンドラを呼び出し
             let handler
-            if (handler = this[`_handle_${node.nodeName}`])
+            if (handler = this[`_handle_${node.nodeName}`]) {
                 handler(node);
-
+            }
+            // 空要素を削除
+            if (!handler && node.childNodes.length === 0) {
+                node.remove_();
+            }
             // ラッパー要素と判断する条件:
             // 1. 子ノードが1つだけ
             // 2. その子ノードがElement
-            // (3. 特別な属性がない)
             const child = node.firstChild
             const hasOneChild = node.childNodes.length === 1;
             const hasElementChild = child && child.nodeType === Node.ELEMENT_NODE;
-            // const hasSpecialAttributes = Array.from(node.attributes).some(attr =>
-            //     attr.name.startsWith('data-') ||
-            //     attr.name.startsWith('aria-') ||
-            //     attr.name === 'role');
             if (hasOneChild && hasElementChild) { // && !hasSpecialAttributes) {
-                node.replaceWith(child);
+                node.replaceWith_(child);
             }
         }
+    }
+
+    _handle_SCRIPT(script) {
+        script.remove();
+    }
+
+    _handle_STYLE(style) {
+        style.remove();
     }
 
     _handle_IMG(img) {
@@ -123,6 +167,7 @@ export class NakedHTML {
 
         video.replaceWith(a);
     }
+    _result() {
+
+    }
 }
-
-

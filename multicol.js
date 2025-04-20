@@ -22,7 +22,7 @@ import { Columnizer } from "./Columnizer.js";
 // contents.js -> background.js -> multicol.js と渡ってくるbody.outerHTMLを処理するコールバックを登録
 crm.waitDataFromBackground((bodyHtml => {
     try {
-        const nHtml = new NakedHTML();
+        const nHtml = new NakedHTML(bodyHtml);
         nHtml.removeAttributes();
         nHtml.removeWrappers();
 

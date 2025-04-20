@@ -26,7 +26,7 @@ export class Tab {
     }
 
     /**
-     * このタブにaction名"feedData"でデータを送信します（タブのhtml側はcrm.getRequestで受け取ります）。
+     * このタブにaction名"feedData"でデータを送信します（タブのhtml側はcrm.waitDataFromBackgroundのコールバックで受け取ります）。
      * @param {any} data 送信するデータ
      * @param {number} [timeout=5000] タイムアウトまでのミリ秒数
      * @returns {Promise<any>} コンテンツスクリプトからの応答
@@ -103,7 +103,7 @@ export class Tab {
 class Crm {
     /**
      * ChromeのUIを抽象化するクラス
-     * @version 20250407
+     * @version 20250420
      */
     constructor() {
 
@@ -170,54 +170,34 @@ class Crm {
         return chrome.runtime.sendMessage({ action: "readyCheck" });
     }
 
-
     /**
-     * バックグラウンドスクリプトとの初期通信シーケンスを実行し、供給されるデータを取得します。
-     * (1. 準備完了を通知し、2. データ供給メッセージを待ち受ける)。
-     * タブスクリプト(multicol.jsなど)での使用を想定しています。
-     * @param {number} [timeout=10000] データ待ち受けのタイムアウト（ミリ秒）。準備完了通知の待ち時間も含む全体のタイムアウトと考える方が良いかもしれません。
-     * @returns {Promise<any>} バックグラウンドスクリプトから供給されたデータ（feedData の request.data）。
-     * @throws {Error} 通信シーケンス中にエラーが発生した場合（タイムアウトなど）。
+     * Registers a callback to handle incoming feedData messages from the background script.
+     * The callback is invoked with the data when a message with action "feedData" is received.
+     * 
+     * @param {function(string): void} callBack - The callback function to process the received data.
+     *   It receives the HTML content as a string and performs the desired action (e.g., rendering).
+     * @returns {void}
+     * @example
+     * crm.waitDataFromBackground((html) => {
+     *   console.log("Received HTML:", html);
+     *   document.body.innerHTML = html;
+     * });
      */
-    async getDataFromBackground(timeout = 10000) {
-        console.log('Crm (from tab): Starting data acquisition sequence from background...');
-
-        try {
-            // 準備完了を通知し、バックグラウンドからの応答を待つ
-            const readyResponse = await this.signalReady();
-            console.log('Crm (from tab): Ready signal sent, received response:', readyResponse);
-
-            // バックグラウンドからデータが送られてくるのを待つ
-            const data = await this.getRequest("feedData", timeout);
-            console.log('Crm (from tab): Received feedData.');
-
-            return data;
-
-        } catch (error) {
-            console.error('Crm (from tab): Error during data acquisition sequence:', error);
-            // エラーは呼び出し元(multicol.js)で捕捉できるよう再スロー
-            throw error;
-        }
-    }
-
-    getRequest(actionName, timeout = 10000) {
-        return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-                chrome.runtime.onMessage.removeListener(listener);
-                reject(new Error(`アクション "${actionName}" の待機がタイムアウトしました。`));
-            }, timeout);
-
-            const listener = (request, sender, sendResponse) => {
-                if (request && request.action === actionName) {
-                    clearTimeout(timer);
-                    chrome.runtime.onMessage.removeListener(listener);
-                    resolve(request.data);
-                    sendResponse({ status: "received" });
-                    return true;
-                }
-            };
-
-            chrome.runtime.onMessage.addListener(listener);
+    waitDataFromBackground(callBack) {
+        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+            if (request.action !== "feedData") return;
+            callBack(request.data);
+            sendResponse({ status: "success" });
+        });
+        document.addEventListener("DOMContentLoaded", async () => {
+            // console.log("DOM fully loaded, signaling ready.");
+            try {
+                // console.log("Sending readyCheck...");
+                await this.signalReady();
+                // console.log("Ready signal sent successfully.");
+            } catch (e) {
+                console.error("Error sending ready signal:", e);
+            }
         });
     }
 

@@ -1,19 +1,33 @@
 import { crm } from "./Crm.js";
-import { NakedHTML } from "NakedHTML.js";
-import { Columnizer } from "Columnizer.js";
+import { NakedHTML } from "./NakedHTML.js";
+import { Columnizer } from "./Columnizer.js";
 
 // console.log("multicol.js: Script loaded, initializing...");
 
 // 即リスナー登録
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    // console.log("multicol.js: Received message:", request);
-    if (request.action === "feedData") {
-        // console.log("multicol.js: Processing feedData:", request.data);
-        document.body.innerHTML = request.data;
-        sendResponse({ status: "success" });
-        return true;
+// chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+//     // console.log("multicol.js: Received message:", request);
+//     if (request.action === "feedData") {
+//         // console.log("multicol.js: Processing feedData:", request.data);
+
+//         document.body.innerHTML = request.data;
+
+//         sendResponse({ status: "success" });
+//         return true;
+//     }
+// });
+
+crm.waitDataFromBackground((bodyHtml) => {
+
+    try {
+        const columnizer = new Columnizer(bodyHtml);
+        columnizer.main();
+    } catch (error) {
+        console.error("multicol.js: コンテンツ処理に失敗しました:", error);
+        document.body.textContent = "コンテンツを読み込めませんでした。このタブを閉じて取得操作をやり直して下さい。";
     }
 });
+
 
 document.addEventListener("DOMContentLoaded", async () => {
     console.log("multicol.js: DOM fully loaded, signaling ready.");
@@ -27,3 +41,4 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.body.textContent = "Error sending ready signal: " + e.message;
     }
 });
+

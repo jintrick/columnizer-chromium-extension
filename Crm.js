@@ -33,7 +33,7 @@ export class Tab {
      */
     async feed(data, timeout = 5000) {
         try {
-            await this._waitForReady(timeout);
+            console.log(`Tab ${this._tab.id}: Sending feed data...`);
             return await this.sendMessage({ action: "feedData", data: data });
         } catch (error) {
             console.error(`タブ ${this._tab.id} へのデータ送信に失敗しました:`, error);
@@ -43,43 +43,41 @@ export class Tab {
 
     async _waitForReady(timeout) {
         return new Promise((resolve, reject) => {
-            let isReadySignaled = false; // ★ フラグを追加 ★
-
+            console.log(`Crm (background): Starting _waitForReady for tab ${this._tab.id}`);
             const timeoutId = setTimeout(() => {
-                if (!isReadySignaled) { // ★ フラグを確認してタイムアウト判定 ★
-                    console.error(`Tab ${this._tab.id} の準備完了をタイムアウトしました。`); // ログを追加
-                    chrome.runtime.onMessage.removeListener(listener);
-                    reject(new Error(`タブ ${this._tab.id} の準備完了をタイムアウトしました。`));
-                }
+                chrome.runtime.onMessage.removeListener(listener);
+                console.log(`Crm (background): Timeout for tab ${this._tab.id}`);
+                reject(new Error(`タブ ${this._tab.id} の準備完了をタイムアウトしました。`));
             }, timeout);
 
             const listener = (request, sender, sendResponse) => {
-                // 特定のタブからの readyCheck メッセージのみを処理
-                if (sender.tab && sender.tab.id === this._tab.id && request.action === "readyCheck") {
-                    console.log(`Crm (background): Received readyCheck from tab ${this._tab.id}`); // ログを追加
-                    isReadySignaled = true; // ★ フラグを立てる ★
-                    clearTimeout(timeoutId); // タイマーをクリア
-
-                    // リスナーを削除
-                    chrome.runtime.onMessage.removeListener(listener);
-
-                    // プロミスを解決
-                    resolve();
-
-                    // タブに応答を返す
-                    sendResponse({ ready: true });
-                    return true; // 非同期応答のために必要
-
+                console.log(`Crm (background): Received message for tab ${this._tab.id}:`, request, sender);
+                if (!sender.tab) {
+                    console.log(`Crm (background): Ignoring message with no tab:`, request);
+                    return;
                 }
-            };
-            // リスナー登録はPromise作成後すぐに行う
-            chrome.runtime.onMessage.addListener(listener);
+                if (sender.tab.id !== this._tab.id) {
+                    console.log(`Crm (background): Ignoring message from wrong tab ${sender.tab.id}, expected ${this._tab.id}`);
+                    return;
+                }
+                if (request.action !== "readyCheck") {
+                    console.log(`Crm (background): Ignoring non-readyCheck message:`, request.action);
+                    return;
+                }
 
-            // タブに対して準備完了信号を送るように促すメッセージを送信（現在の設計の場合）
-            // このメッセージがなくても、タブが起動時にreadyCheckを送る設計でも良い
-            // this.sendMessage({ action: "readyCheckTrigger" }); // ← 現在のコードにはないが、設計によっては必要
+                console.log(`Crm (background): Processing readyCheck for tab ${this._tab.id}`);
+                clearTimeout(timeoutId);
+                chrome.runtime.onMessage.removeListener(listener);
+                resolve();
+                sendResponse({ ready: true });
+                return true;
+            };
+
+            chrome.runtime.onMessage.addListener(listener);
+            console.log(`Crm (background): Listener added for tab ${this._tab.id}`);
         });
     }
+
     async _waitForReady__(timeout) {
         return new Promise((resolve, reject) => {
             const timeoutId = setTimeout(() => {

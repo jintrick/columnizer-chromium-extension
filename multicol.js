@@ -1,16 +1,13 @@
-console.log("multicol.js: Minimal test start.");
 import { crm } from "./Crm.js";
-console.log("multicol.js: Minimal test imports complete, signaling ready.");
 
-crm.signalReady()
-    .then(() => {
+document.addEventListener("DOMContentLoaded", async () => {
+    console.log("multicol.js: DOM fully loaded, signaling ready.");
+    try {
+        await crm.signalReady();
         console.log("multicol.js: Ready signal sent successfully.");
-        // ここで処理を止めたり、簡単な表示だけしてみる
-        document.body.textContent = 'Ready signal sent.';
-    })
-    .catch(e => {
+        document.body.textContent = "Ready signal sent.";
+    } catch (e) {
         console.error("multicol.js: Error sending ready signal:", e);
-        document.body.textContent = 'Error sending ready signal: ' + e.message;
-    });
-
-console.log("multicol.js: Minimal test end.");
+        document.body.textContent = "Error sending ready signal: " + e.message;
+    }
+});

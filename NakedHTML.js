@@ -17,9 +17,10 @@ Node.prototype.remove_ = function () {
 export class NakedHTML {
     // マルチカラム用に加工するHTMLをDocumentFragment内で扱うクラス
 
-    #ATTRIBUTES_TO_KEEP = ['href', 'alt', 'title', 'lang', 'src'];
-    #WRAPPERS_TO_KEEP = ['TABLE', 'UL', 'OL', 'SVG', 'VIDEO', 'A'];
-    #NODE_TO_REMOVE = ['SCRIPT', 'STYLE', '#comment'];
+    #ATTRIBUTES_TO_KEEP = ['href', 'alt', 'title', 'lang', 'src']; // 保全したい属性
+    #WRAPPERS_TO_KEEP = ['TABLE', 'UL', 'OL', 'VIDEO', 'A']; // ラッパー的に使われるものの、論理性のある要素
+    #ELEMENTS_TO_KEEP = ['SVG']; // 保全したい要素（子孫含め）
+    #NODE_TO_REMOVE = ['SCRIPT', 'STYLE', '#comment']; // 削除したい要素（子孫含め）
     constructor(rootElement) {
         this.root = rootElement;
         this.result = {
@@ -33,6 +34,7 @@ export class NakedHTML {
         return this.root.outerHTML;
     }
 
+    // 優先順位１：不要な要素を削除する
     removeNodes(target = this.#NODE_TO_REMOVE) {
         // 削除対象を先に収集する
         const nodesToRemove = [];
@@ -40,7 +42,7 @@ export class NakedHTML {
 
         let el = walker.currentNode;
         while (el) {
-            if (this.#NODE_TO_REMOVE.includes(el.nodeName)) {
+            if (target.includes(el.nodeName)) {
                 nodesToRemove.push(el);
             }
             el = walker.nextNode();
@@ -66,7 +68,7 @@ export class NakedHTML {
             // 各属性をチェックし、保持リストにないものを削除
             Array.from(el.attributes).forEach(attr => {
                 const attrName = attr.name;
-                if (!this.#ATTRIBUTES_TO_KEEP.includes(attrName)) {
+                if (!exeption.includes(attrName)) {
                     el.removeAttribute(attrName);
                 }
             });
@@ -74,7 +76,10 @@ export class NakedHTML {
         }
     }
 
-    removeWrappers(parent = this.root, exeption = this.#WRAPPERS_TO_KEEP) {
+    removeWrappers(parent = this.root, exeption = this.#WRAPPERS_TO_KEEP, protected = this.#ELEMENTS_TO_KEEP) {
+        // 保全対象要素はスキップ
+        if (protected.includes(parent.nodeName)) return;
+
         // 子ノードのリストを作成（ライブコレクションの変更を避けるため）
         const children = Array.from(parent.childNodes);
 
@@ -83,7 +88,7 @@ export class NakedHTML {
 
             // 要素ノードだけを処理
             if (node.nodeType !== Node.ELEMENT_NODE
-                || this.#WRAPPERS_TO_KEEP.includes(node.nodeName)) continue;
+                || exeption.includes(node.nodeName)) continue;
 
             // 末端から再帰的に処理
             this.removeWrappers(node);
@@ -108,6 +113,7 @@ export class NakedHTML {
             }
         }
     }
+
 
     _handle_SCRIPT(script) {
         script.remove();

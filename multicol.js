@@ -22,10 +22,11 @@ import { Columnizer } from "./Columnizer.js";
 // contents.js -> background.js -> multicol.js と渡ってくるbody.outerHTMLを処理するコールバックを登録
 crm.waitDataFromBackground((bodyHtml => {
     try {
-        const nHtml = new NakedHTML(bodyHtml);
+        const nHtml = NakedHTML.fromString(bodyHtml);
+        nHtml.removeNodes();
         nHtml.removeAttributes();
         nHtml.removeWrappers();
-
+        debugger;
         const columnizer = new Columnizer(nHtml.toString());
         columnizer.main();
     } catch (error) {

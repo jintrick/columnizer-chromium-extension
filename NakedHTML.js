@@ -11,18 +11,24 @@ Element.prototype.replaceWith_ = function (node) {
 };
 Node.prototype.remove_ = function () {
     console.log(`${this.nodeName} is removed.`, this);
-    this.remove();
+    try {
+        this.remove();
+    } catch (error) {
+        console.warn("Error removing node:", error, this);
+    }
 };
 
 export class NakedHTML {
     // マルチカラム用に加工するHTMLをDocumentFragment内で扱うクラス
 
     #ATTRIBUTES_TO_KEEP = ['href', 'alt', 'title', 'lang', 'src']; // 保全したい属性
-    #WRAPPERS_TO_KEEP = ['TABLE', 'UL', 'OL', 'VIDEO', 'A']; // ラッパー的に使われるものの、論理性のある要素
+    // #WRAPPERS_TO_KEEP = ['TABLE', 'UL', 'OL', 'VIDEO', 'A']; // ラッパー的に使われるものの、論理性のある要素
+    #WRAPPERS = ['DIV', 'SPAN', 'SECTION', 'ARTICLE', 'ASIDE'];
     #ELEMENTS_TO_KEEP = ['SVG']; // 保全したい要素（子孫含め）
-    #NODE_TO_REMOVE = ['SCRIPT', 'STYLE', '#comment']; // 削除したい要素（子孫含め）
-    constructor(rootElement) {
-        this.root = rootElement;
+    #NODE_TO_REMOVE = ['SCRIPT', 'STYLE', 'META', 'LINK', 'HEAD', '#comment']; // 削除したい要素（子孫含め）
+    constructor(rootNode, ownerDoc = document) {
+        this.doc = ownerDoc;
+        this.root = rootNode;
         this.result = {
             removeNodes: [],
             removeAttributes: [],
@@ -30,40 +36,61 @@ export class NakedHTML {
         }
     }
 
-    toString() {
-        return this.root.outerHTML;
+    static fromString(text, ownerDoc = document) {
+        const div = ownerDoc.createElement('div');
+        try {
+            div.innerHTML = text;
+        } catch (error) {
+            console.error('NakedHTMLを初期化できません: innerHTMLへのセットに失敗しました');
+            return null;
+        }
+        const df = ownerDoc.createDocumentFragment();
+        div.childNodes.forEach(node => df.appendChild(node));
+        return new NakedHTML(df, ownerDoc);
     }
 
-    // 優先順位１：不要な要素を削除する
-    removeNodes(target = this.#NODE_TO_REMOVE) {
-        // 削除対象を先に収集する
-        const nodesToRemove = [];
-        const walker = document.createTreeWalker(this.root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_COMMENT);
+    toString() {
+        if (this.root instanceof DocumentFragment) {
+            const tempDiv = this.root.ownerDocument.createElement('div');
+            tempDiv.appendChild(this.root.cloneNode(true));
+            return tempDiv.innerHTML;
+        } else {
+            return this.root.outerHTML;
+        }
+    }
 
-        let el = walker.currentNode;
-        while (el) {
-            if (target.includes(el.nodeName)) {
-                nodesToRemove.push(el);
+    // 不要な要素を削除する（使うなら他のメソッドに先行して呼ぶことを推奨）
+    removeNodes(target = this.#NODE_TO_REMOVE, exception = this.#ELEMENTS_TO_KEEP) {
+
+        const nodesToRemove = [];
+        rec_CollectTarget(this.root);
+        nodesToRemove.forEach(node => node.remove());
+
+        function rec_CollectTarget(node) {
+            // 保全対象ノードの場合
+            if (node.nodeType === Node.ELEMENT_NODE && exception.includes(node.nodeName)) {
+                return;
             }
-            el = walker.nextNode();
+            // 削除対象のノードタイプの場合
+            if (target.includes(node.nodeName)) {
+                nodesToRemove.push(node);
+                return;
+            }
+            // 子ノードを再帰的に走査する
+            node.childNodes.forEach(child => {
+                rec_CollectTarget(child);
+            });
         }
 
-        // 収集したノードを削除する
-        nodesToRemove.forEach(node => {
-            try {
-                node.remove_();
-            } catch (error) {
-                console.warn(error);
-            }
-        });
     }
+
 
     removeAttributes(exeption = this.#ATTRIBUTES_TO_KEEP) {
         // TreeWalkerの作成
-        const walker = document.createTreeWalker(this.root, NodeFilter.SHOW_ELEMENT);
+        const walker = this.doc.createTreeWalker(this.root, NodeFilter.SHOW_ELEMENT);
 
         // 各ノードを巡回
-        let el = this.root;
+        let el = this.root instanceof DocumentFragment ? walker.nextNode() : this.root;
         while (el) {
             // 各属性をチェックし、保持リストにないものを削除
             Array.from(el.attributes).forEach(attr => {
@@ -76,39 +103,45 @@ export class NakedHTML {
         }
     }
 
-    removeWrappers(parent = this.root, exeption = this.#WRAPPERS_TO_KEEP, protected = this.#ELEMENTS_TO_KEEP) {
+    removeWrappers(parent = this.root, target = this.#WRAPPERS, exception = this.#ELEMENTS_TO_KEEP) {
         // 保全対象要素はスキップ
-        if (protected.includes(parent.nodeName)) return;
+        if (exception.includes(parent.nodeName)) return;
 
         // 子ノードのリストを作成（ライブコレクションの変更を避けるため）
         const children = Array.from(parent.childNodes);
 
         // 各子ノードを処理
         for (const node of children) {
-
+            const isElement = node.nodeType === Node.ELEMENT_NODE;
             // 要素ノードだけを処理
-            if (node.nodeType !== Node.ELEMENT_NODE
-                || exeption.includes(node.nodeName)) continue;
+            if (!isElement) continue;
 
             // 末端から再帰的に処理
             this.removeWrappers(node);
 
             //要素別のハンドラを呼び出し
-            let handler
-            if (handler = this[`_handle_${node.nodeName}`]) {
+            const handler = this[`_handle_${node.nodeName}`];
+            if (handler) {
                 handler(node);
+                continue;
             }
             // 空要素を削除
-            if (!handler && node.childNodes.length === 0) {
+            const isEmpty = node.childNodes.length === 0 && !node.hasAttributes();
+            if (isEmpty) {
                 node.remove_();
+                continue;
             }
+            // ここからは指定されたtarget要素のみが対象（デフォルトはコンテナ要素）
+            if (!target.includes(node.nodeName)) continue;
+
             // ラッパー要素と判断する条件:
-            // 1. 子ノードが1つだけ
-            // 2. その子ノードがElement
+            // 1. ノード名が引数targetの配列に含まれている
+            // 2. 子ノードが1つだけ
+            // 3. その子ノードがElement
             const child = node.firstChild
             const hasOneChild = node.childNodes.length === 1;
             const hasElementChild = child && child.nodeType === Node.ELEMENT_NODE;
-            if (hasOneChild && hasElementChild) { // && !hasSpecialAttributes) {
+            if (hasOneChild && hasElementChild) {
                 node.replaceWith_(child);
             }
         }

@@ -16,6 +16,13 @@ function testNakedHTML() {
     // 現在のページのBodyに対してNakedHTMLを適用
     const nakedHtml = new NakedHTML(testElement);
 
+    // 不要な要素を削除するテスト
+    console.log('\n--- 不要な要素削除テスト ---');
+    console.time('removeNodes');
+    nakedHtml.removeNodes();
+    console.timeEnd('removeNodes');
+    console.log('不要な要素削除後:', testElement);
+
     // 属性の削除をテスト
     console.log('\n--- 属性削除テスト ---');
     console.time('removeAttributes');
@@ -34,6 +41,16 @@ function testNakedHTML() {
     console.log('\n--- 結果比較 ---');
     console.log('処理後のHTML:', testElement.outerHTML.length, '文字');
     console.log('サイズ変化率:', Math.round((testElement.outerHTML.length / document.body.outerHTML.length) * 100) + '%');
+
+    // 削除された特定の要素をチェック
+    const scripts = Array.from(testElement.querySelectorAll('script'));
+    const styles = Array.from(testElement.querySelectorAll('style'));
+    const comments = Array.from(testElement.childNodes).filter(node => node.nodeType === 8); // Comment nodes
+
+    console.log('\n--- 削除された要素チェック ---');
+    console.log(`スクリプト要素残存数: ${scripts.length}件`);
+    console.log(`スタイル要素残存数: ${styles.length}件`);
+    console.log(`コメント要素残存数: ${comments.length}件`);
 
     // 特定の要素の変換をチェック
     const imgLinks = Array.from(testElement.querySelectorAll('a[data-role="img"]'));
@@ -59,10 +76,12 @@ function testNakedHTML() {
     // 保持されるべき要素のチェック
     const tables = Array.from(testElement.querySelectorAll('table'));
     const lists = Array.from(testElement.querySelectorAll('ul, ol'));
+    const svgs = Array.from(testElement.querySelectorAll('svg'));
 
     console.log('\n--- 保持された要素 ---');
     console.log(`テーブル: ${tables.length}件`);
     console.log(`リスト(UL/OL): ${lists.length}件`);
+    console.log(`SVG: ${svgs.length}件`);
 
     console.log('\n=== テスト完了 ===');
 
@@ -75,7 +94,11 @@ function testNakedHTML() {
         processed: testElement.outerHTML,
         originalSize: document.body.outerHTML.length,
         processedSize: testElement.outerHTML.length,
-        sizeReduction: Math.round((1 - testElement.outerHTML.length / document.body.outerHTML.length) * 100)
+        sizeReduction: Math.round((1 - testElement.outerHTML.length / document.body.outerHTML.length) * 100),
+        removedElements: {
+            scripts: document.querySelectorAll('script').length - scripts.length,
+            styles: document.querySelectorAll('style').length - styles.length
+        }
     };
 }
 

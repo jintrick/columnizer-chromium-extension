@@ -36,10 +36,8 @@ async function markStartElement(request, sender, sendResponse) {
     if (!body) {
         debugger; console.warn("Columnizer: body要素の取得に失敗しました");
         return sendResponse({ data: "このウェブページはマルチカラム化できません（HTML文書ではありません）", status: "error" });
-
     }
 
-    const START_ELEMENT_ATTR = 'data-net-jintrick-columnizer-start-elemet';
     contextElement.setAttribute(START_ELEMENT_ATTR, "");
 
     // 開始要素にdata-*属性をつけたbody要素をクリーンアップしてbackground.jsに送信
@@ -48,7 +46,7 @@ async function markStartElement(request, sender, sendResponse) {
     // nakedHtml.removeWrappers();
     // nakedHtml.removeAttributes();
     // sendResponse({ data: nakedHtml.toString(), status: "success" });
-    const responseObj = { data: body.outerHTML, status: 'success', bug: 'booooooon!' };
+    const responseObj = { data: body.outerHTML, status: 'success' };
     sendResponse(responseObj);
 
     console.log('Columnizer: 加工済みHTMLをbackgroundに送信しました。');

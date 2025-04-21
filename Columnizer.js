@@ -1,6 +1,31 @@
 // import { ReverseTreeDOM } from "./ReverseTreeDOM.js";
 import { crm } from "./Crm.js";
 
+
+HTMLElement.prototype.xpath = function (expression, resultType = XPathResult.ORDERED_NODE_SNAPSHOT_TYPE) {
+    const evaluator = new XPathEvaluator();
+    const result = evaluator.evaluate(expression, this, null, resultType, null);
+    return Array.from({ length: result.snapshotLength }, (_, i) => result.snapshotItem(i));
+};
+
+Object.defineProperty(DocumentFragment.prototype, 'innerHTML', {
+    set: function (newValue) {
+        const div = document.createElement("DIV");
+        div.innerHTML = newValue;
+        while (div.firstChild) {
+            this.appendChild(div.firstChild);
+        }
+    },
+    get: function () {
+        const div = document.createElement("DIV");
+        div.appendChild(this.cloneNode(true));
+        return div.innerHTML;
+    },
+    enumerable: false,
+    configurable: false
+});
+
+
 export class Columnizer {
     constructor(bodyHtml) {
         const START_ELEMENT_ATTR = 'data-net-jintrick-columnizer-start-elemet';
@@ -30,29 +55,6 @@ class StateManager {
     }
 }
 
-
-HTMLElement.prototype.xpath = function (expression, resultType = XPathResult.ORDERED_NODE_SNAPSHOT_TYPE) {
-    const evaluator = new XPathEvaluator();
-    const result = evaluator.evaluate(expression, this, null, resultType, null);
-    return Array.from({ length: result.snapshotLength }, (_, i) => result.snapshotItem(i));
-};
-
-Object.defineProperty(DocumentFragment.prototype, 'innerHTML', {
-    set: function (newValue) {
-        const div = document.createElement("DIV");
-        div.innerHTML = newValue;
-        while (div.firstChild) {
-            this.appendChild(div.firstChild);
-        }
-    },
-    get: function () {
-        const div = document.createElement("DIV");
-        div.appendChild(this.cloneNode(true));
-        return div.innerHTML;
-    },
-    enumerable: false,
-    configurable: false
-});
 
 
 class ReverseTreeDOM {

@@ -57,7 +57,7 @@ class StateManager {
 
 
 
-class ReverseTreeDOM {
+export class ReverseTreeDOM {
     /**
      * ツリー状のソースDOMの操作と参照に責務を負うクラス
      * @param {*} html - HTMLコード断片, DOM, またはNodeList
@@ -111,7 +111,7 @@ class ReverseTreeDOM {
 
 
 // ReverseTreeDOMのrootElementを確定する責務を負う（ユーザーに選択させるGUIの提供）
-class MulticolRanger {
+export class MulticolRanger {
     #ui = `
 <button is="widen-button" class="enable" title="${crm.i18n('widen')}">範囲を広げる</button>
 <button is="undo-button" class="disable" title="${crm.i18n('undo')}">元に戻す</button>`

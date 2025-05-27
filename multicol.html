@@ -5,9 +5,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Columnizer - マルチカラム表示</title>
-    <script src="./multicol.js" type="module" defer></script>
+    <!-- script src="./multicol.js" type="module" defer></script -->
+    <style>
+        #output-container,
+        #metrics-container {
+            display: block;
+        }
+
+        #metrics-container {
+            visibility: hidden;
+        }
+    </style>
 </head>
 
-<body></body>
+<body>
+    <div id="output-container" contenteditable>
+        <!-- <page-div /> やtree-domを入れる -->
+    </div>
+    <div id="controler">
+        <button id="prev">Prev</button>
+        <button id="next">Next</button>
+    </div>
+    <div id="metrics-container">
+        <!-- <page-div />を測定時に一時的に入れる -->
+    </div>
+</body>
 
 </html>

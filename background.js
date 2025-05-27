@@ -21,7 +21,7 @@ chrome.runtime.onInstalled.addListener(() => {
         title: "マルチカラムで表示",
         contexts: ["page", "selection", "link", "image", "video", "audio"]
     });
-    console.log("Columnizer: コンテキストメニューを作成しました。");
+    console.log("background: コンテキストメニューを作成しました。");
 });
 
 // コンテクストメニューにイベントリスナーを登録
@@ -30,7 +30,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         return;
     }
 
-    console.log("Columnizer: コンテキストメニューがクリックされました。", info);
+    console.log("background: コンテキストメニューがクリックされました。", info);
 
     let result;
 
@@ -42,7 +42,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             return;
         }
     } catch (error) {
-        console.error("Columnizer: コンテンツスクリプトから応答を得られませんでした。:", error);
+        console.error("background: コンテンツスクリプトから応答を得られませんでした。:", error);
         return;
     }
 
@@ -52,7 +52,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         const newTab = await crm.createNewTab("./multicol.html", 15000);
         await newTab.feed(bodyHtml, 10000);
     } catch (error) {
-        console.error("Columnizer: muticol.htmlから応答を得られませんでした。:", error);
+        console.error("background: muticol.htmlから応答を得られませんでした。:", error);
     }
 
 });

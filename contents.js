@@ -11,7 +11,15 @@ const START_ELEMENT_ATTR = 'data-net-jintrick-columnizer-start-elemet';
 document.addEventListener('contextmenu', setContextElement, true); // キャプチャフェーズで捕捉 (より確実に)
 
 // コールバック登録：ブラウザ経由のメッセージ受信時
-chrome.runtime.onMessage.addListener(markStartElement);
+// chrome.runtime.onMessage.addListener(markStartElement);
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log("contents.js: メッセージ受信:", request, "sender:", sender);
+    markStartElement(request, sender, sendResponse);
+    return true; // 非同期応答を有効化
+});
+
+console.log("contents.js: リスナー登録完了");
 
 // 右クリック時のコンテクスト要素を特定
 function setContextElement(event) {
